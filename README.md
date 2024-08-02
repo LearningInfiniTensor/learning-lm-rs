@@ -19,14 +19,17 @@
 
 ### 1. 算子：SiLU函数（10分）
 
-请在`src/operators.rs`中实现SiLU函数,其公式为：
+请在`src/operators.rs`中实现SiLU算子，其公式为：
 
 $$
-y=sigmoid(y) × y × x
+y=silu(y) × x
 $$
 
 其中
 
+$$
+silu(x) = sigmoid(x) × x
+$$
 $$
 sigmoid(x) = \frac{1}{1 + e^{-x}}
 $$

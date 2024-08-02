@@ -30,6 +30,7 @@ $$
 $$
 silu(x) = sigmoid(x) × x
 $$
+
 $$
 sigmoid(x) = \frac{1}{1 + e^{-x}}
 $$

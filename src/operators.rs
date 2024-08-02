@@ -74,7 +74,7 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
     todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
 }
 
-// y = sigmoid(y) * y * x
+// y = sigmoid(x) * x * y
 // hint: this is an element-wise operation
 pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
     // let len = y.size();

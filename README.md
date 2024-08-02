@@ -22,7 +22,7 @@
 请在`src/operators.rs`中实现SiLU算子，其公式为：
 
 $$
-y=silu(y) × x
+y=silu(x) × y
 $$
 
 其中

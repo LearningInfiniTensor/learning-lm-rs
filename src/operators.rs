@@ -1,3 +1,5 @@
+use std::f32::consts::SQRT_2;
+
 use crate::tensor::Tensor;
 
 // get (row) vectors from a 2D table given a list of indices
@@ -71,7 +73,24 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    let y_data=unsafe {
+        y.data_mut()
+    };
+
+    let shape=x.shape();
+    for i in 0..shape[0] {
+        let row_range = i*shape[1]..(i+1)*shape[1];
+        let sq = ((x.data()[row_range.clone()]
+            .iter()
+            .map(|&x| x.powi(2))
+            .sum::<f32>()/shape[1] as f32)+epsilon).sqrt();
+        y_data[row_range.clone()].iter_mut()
+        .zip(x.data()[row_range].iter().zip(w.data().iter())).for_each(
+            |(y_d,(x_d,w_d,))|{
+                *y_d = (*w_d * *x_d )/ sq;
+            }
+        );
+    }
 }
 
 // y = sigmoid(x) * x * y

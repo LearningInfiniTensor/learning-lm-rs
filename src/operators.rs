@@ -71,27 +71,71 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
-}
+    let shape = y.shape().clone();
+    let len = shape.len();
+    let last_dim = len - 1;
+    let _y = unsafe { y.data_mut() };
+    let _x = x.data();
+    let _w = w.data();
 
+    let mut ext_loop = 1;
+    for i in 0..(shape.len() - 1) {
+        ext_loop *= shape[i];
+    }
+    let inner_size = shape[last_dim];
+
+    for i in 0..ext_loop {
+        let mut xp = 0f32;
+        for j in 0..shape[last_dim] {
+            xp += _x[i * inner_size + j] * _x[i * inner_size + j];
+            _y[i * inner_size + j] = _w[j] * _x[i * inner_size + j];
+        }
+        xp = f32::sqrt(xp / inner_size as f32 + epsilon);
+        for j in 0..shape[last_dim] {
+            _y[i * inner_size + j] /= xp;
+        }   
+    }
+}
 // y = sigmoid(x) * x * y
 // hint: this is an element-wise operation
 pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
-    // let len = y.size();
-    // assert!(len == x.size());
+    let len = y.size();
+    assert!(len == x.size());
 
-    // let _y = unsafe { y.data_mut() };
-    // let _x = x.data();
+    let _y = unsafe { y.data_mut() };
+    let _x = x.data();
 
-    todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+    for i in 0..len {
+        _y[i] = _y[i] * _x[i] / (1f32 + f32::exp(-_x[i]));
+    }
 }
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
-    todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
-}
+    let shape_c = c.shape();
+    let (c_rows, c_cols) = (shape_c[0], shape_c[1]);
+    let inner = a.shape()[1];
+    let _c = unsafe { c.data_mut() };
+    let _a = a.data();
+    let _b = b.data();
 
+    // Scale c by beta
+    for val in _c.iter_mut() {
+        *val *= beta;
+    }
+
+    // Perform matrix multiplication
+    for x in 0..c_rows {
+        for y in 0..c_cols {
+            let mut sum = 0f32;
+            for k in 0..inner {
+                sum += _a[x * inner + k] * _b[y * inner + k];
+            }
+            _c[x * c_cols + y] += alpha * sum;
+        }
+    }
+}
 // Dot product of two tensors (treated as vectors)
 #[allow(unused)]
 pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {

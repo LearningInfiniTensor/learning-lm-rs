@@ -28,7 +28,7 @@ epsilon = 1e-6
 rms_norm(matrix, w, epsilon)
 
 # A random example
-matrix = torch.randn(2, 2, 3, dtype=torch.float32)
-w = torch.randn(3, dtype=torch.float32)
+matrix = torch.randn(2, 2, 3, 3, dtype=torch.float32)
+w = torch.tensor([10., 12., 8.], dtype=torch.float32)
 epsilon = 1e-6 
 rms_norm(matrix, w, epsilon)

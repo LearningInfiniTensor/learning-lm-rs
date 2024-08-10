@@ -2,7 +2,6 @@ import torch
 
 def matmul_trans(alpha, beta, A, B, C):
     print("-----------------------matmul-------------------------")
-    # 创建矩阵 A 和 B，形状相同
     print("input A = ")
     print(A)
     print("input B = ")

@@ -50,7 +50,7 @@ $$
 请在`src/operators.rs`中实现RMS Normalization，其公式为：
 
 $$
-y_i=\frac{w×x_i}{\sqrt{ \sum_{j} x_{ij}^2+\epsilon}}
+y_i=\frac{w×x_i}{\sqrt{ \frac{1}{n} \sum_{j} x_{ij}^2 +\epsilon}}
 $$
 
 注意：

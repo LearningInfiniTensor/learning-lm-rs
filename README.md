@@ -85,9 +85,9 @@ $$
 hidden = rms_norm(residual)
 gate = hidden @ gate_weight.T
 up = hidden @ up_weight.T
-hidden = gate * sigmoid(gate) * up ## silu
-hidden = hidden @ down_weight.T
-residual = hidden + residual
+itermediate = gate * sigmoid(gate) * up ## silu
+output = itermediate @ down_weight.T
+residual = output + residual
 ```
 
 如果你正确地实现了之前地几个算子，那么这个函数的实现应该是相当简单的。需要注意的是，上一层的输出存储于residual这个临时张量中，这就是用到了我们之前提到的残差连接的概念，最终我们实现的神经网络的输出也要加上前一层的residual并存储于residual中，以便于下一层的计算。hidden_states则用于存储过程中的计算结果。你可以用`src/model.rs`中的测例检验你的实现是否正确。

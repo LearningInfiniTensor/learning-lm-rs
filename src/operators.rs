@@ -70,8 +70,31 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
     }
 }
 
+//yi = w * xi / sqrt(1/n * sum_by_j(xij^2)+ e)
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    //x,y是2维矩阵，w是向量
+    assert!(y.shape().len() == 2);
+    let num_token = y.shape()[0];
+    let token_dim = y.shape()[1];
+    assert!(token_dim == x.shape()[1]);
+    assert!(token_dim == w.size());
+    assert!(num_token == x.shape()[0]);
+
+    let _y = unsafe { y.data_mut() };
+    let _x = x.data();
+    let _w = w.data();
+
+    for i in 0..num_token{
+        let mut sum:f32 = 0.0;
+        for j in 0..token_dim{
+            _y[i*num_token+j] = _w[j] * _x[i*num_token+j];
+            sum += _x[i*num_token+j] * _x[i*num_token+j];
+        }
+        for j in  0..token_dim{
+            _y[i*num_token+j] = _y[i*num_token+j] / (1.0/(token_dim as f32) * sum +epsilon).sqrt();
+        }
+
+    }
 }
 
 // y = sigmoid(x) * x * y

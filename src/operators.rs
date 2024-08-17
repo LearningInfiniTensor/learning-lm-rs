@@ -87,11 +87,11 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
     for i in 0..num_token{
         let mut sum:f32 = 0.0;
         for j in 0..token_dim{
-            _y[i*num_token+j] = _w[j] * _x[i*num_token+j];
-            sum += _x[i*num_token+j] * _x[i*num_token+j];
+            _y[i*token_dim+j] = _w[j] * _x[i*token_dim+j];
+            sum += _x[i*token_dim+j] * _x[i*token_dim+j];
         }
         for j in  0..token_dim{
-            _y[i*num_token+j] = _y[i*num_token+j] / (1.0/(token_dim as f32) * sum +epsilon).sqrt();
+            _y[i*token_dim+j] = _y[i*token_dim+j] / (1.0/(token_dim as f32) * sum +epsilon).sqrt();
         }
 
     }
@@ -107,45 +107,31 @@ pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
     let _x = x.data();
 
     for i in 0..len {
-        let xi = _x[i];
-        let sigmoid = 1.0 / (1.0 + (-xi).exp()); // 计算 sigmoid
-        _y[i] = xi * sigmoid * _y[i]; // 计算 silu
+        let sigmoid = 1.0 / (1.0 + (-_x[i]).exp()); // 计算 sigmoid
+        _y[i] = _x[i] * sigmoid * _y[i]; // 计算 silu
+        //println!("{}",i);
     }
 }
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
-    //虽然这些变量在效率意义上很不好，但为了debug方便...
-    let a_row = a.shape()[0];
-    let a_col = a.shape()[1];
-
-    let b_row = b.shape()[0];
-    let b_col = b.shape()[1];
-
-    let c_row = c.shape()[0];
-    let c_col = c.shape()[1];
-
-    assert!(a_col==b_col);
-    assert!(a_row==c_row);
-    assert!(b_row==c_col);
-
-    let _a = a.data();
-    let _b = b.data();
-    let _c = unsafe {c.data_mut()};
-    
-    //矩阵遍历用
-    for j in 0..b_row{
-        for k in 0..a_row{
-            _c[j * a_row + k] = _c[j * a_row + k] * beta;
-            let mut cur_sum = 0.0;
-            //内层循环求和
-            for i in 0..a_col{
-                cur_sum += _a[a_col * k + i] * _b[j * a_col + i];
-            }
-            _c[j * a_row + k] += cur_sum * alpha;
-            //println!("{}",_c[j * b_row + k]);
-        } 
+    //参考了https://github.com/syheliel/learning-lm-rs/blob/main/src/operators.rs
+    //感觉这样写很整齐，我自己的循环和变量略有混乱
+    assert!(c.shape().len() == 2); // TODO: only support two-dimensional matrix
+    assert!(a.shape().len() == 2);
+    assert!(b.shape().len() == 2);
+    let y_num = c.shape()[1];
+    let x_num = c.shape()[0];
+    let k_num = a.shape()[1];
+    let _c = unsafe { c.data_mut() };
+    for x in 0..x_num {
+        let row = &a.data()[x * k_num..(x + 1) * k_num];
+        for y in 0..y_num {
+            let col = &b.data()[y * k_num..(y + 1) * k_num];
+            let sum = row.iter().zip(col.iter()).map(|(a, b)| a * b).sum::<f32>();
+            _c[x * y_num + y] = beta * _c[x * y_num + y] + alpha * sum;
+        }
     }
 }
 
@@ -234,8 +220,34 @@ fn test_silu() {
     let mut y = Tensor::<f32>::new(vec![2., 3., 4.], &vec![1, 3]);
     let x = Tensor::<f32>::new(vec![1., 2., 3.], &vec![1, 3]);
     silu(&mut y, &x);
+    y.print();
     assert!(y.close_to(
         &Tensor::<f32>::new(vec![1.4621172, 5.2847824, 11.43089], &vec![1, 3]),
+        1e-3
+    ));
+    // 新增的测试用例
+    let mut y2 = Tensor::<f32>::new(vec![
+        0.2999985, 0.69999653, 1.0999945,
+        0.2999985, 0.69999653, 1.0999945,
+        0.2999985, 0.69999653, 1.0999945,
+        0.2999985, 0.69999653, 1.0999945,
+    ], &vec![4, 3]);
+    let gate = Tensor::<f32>::new(vec![
+        0.2999985, 0.69999653, 1.0999945,
+        0.2999985, 0.69999653, 1.0999945,
+        0.2999985, 0.69999653, 1.0999945,
+        0.2999985, 0.69999653, 1.0999945,
+    ], &vec![4, 3]);
+    
+    silu(&mut y2, &gate);
+    y2.print();
+    assert!(y2.close_to(
+        &Tensor::<f32>::new(vec![
+            0.05169927, 0.32740837, 0.9078045,
+            0.05169927, 0.32740837, 0.9078045,
+            0.05169927, 0.32740837, 0.9078045,
+            0.05169927, 0.32740837, 0.9078045
+        ], &vec![4, 3]),
         1e-3
     ));
 }
@@ -260,6 +272,8 @@ fn test_matmul_transb() {
     let mut c = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
     let a = Tensor::<f32>::new(vec![1., 2., 3., 4., 5., 6.], &vec![2, 3]);
     let b = Tensor::<f32>::new(vec![1., 2., 3., 4., 5., 6.], &vec![2, 3]);
+    a.print();
+    b.print();
     matmul_transb(&mut c, 1., &a, &b, 1.);
     assert!(c.close_to(
         &Tensor::<f32>::new(vec![15., 34., 35., 81.], &vec![2, 2]),

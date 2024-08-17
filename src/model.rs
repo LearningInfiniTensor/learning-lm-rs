@@ -167,8 +167,20 @@ fn mlp(
     rms_w: &Tensor<f32>,
     eps: f32,
 ) {
-    todo!("Implement mlp");
+    //hidden = rms_norm(residual)
+    OP::rms_norm(hidden_states, residual, rms_w, eps);
+    //gate = hidden @ gate_weight.T
+    OP::matmul_transb(gate, 0.0, hidden_states, w_gate, 1.0);
+    //up = hidden @ up_weight.T
+    OP::matmul_transb(up, 0.0, hidden_states, w_up, 1.0);
+    //itermediate = gate * sigmoid(gate) * up ## silu
+    OP::silu(up,&gate);
+    //output = itermediate @ down_weight.T
+    //residual = output + residual
+    OP::matmul_transb(residual, 1.0, up, w_down, 1.0);
+    residual.print();
 }
+
 
 #[test]
 pub fn test_mlp() {

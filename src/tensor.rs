@@ -53,7 +53,7 @@ impl<T: Copy + Clone + Default> Tensor<T> {
 
     pub fn slice(&self, start: usize, shape: &Vec<usize>) -> Self {
         let new_length: usize = shape.iter().product();
-        assert!(self.offset + start + new_length <= self.length);
+        assert!(new_length <= self.length && start <= self.length - new_length);
         Tensor {
             data: self.data.clone(),
             shape: shape.clone(),
@@ -61,8 +61,6 @@ impl<T: Copy + Clone + Default> Tensor<T> {
             length: new_length,
         }
     }
-
-
 }
 
 // Some helper functions for testing and debugging

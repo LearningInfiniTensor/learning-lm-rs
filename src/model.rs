@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::intrinsics::sqrtf32;
 use std::vec;
 
 use crate::config::LlamaConfigJson;
@@ -101,10 +102,25 @@ impl Llama<f32> {
             let full_k = &mut cache.k_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
             let full_v = &mut cache.v_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
 
-            todo!("self_attention(...)");
-            todo!("down_proj matmul and add residual");
+            self_attention(&mut hidden_states,&mut att_scores,q,full_k,full_v,self.n_kv_h,n_groups,seq_len,total_seq_len,self.dqkv);
 
-            todo!("mlp(...)");
+            //x = x @ O_weight.T
+            //residual = x + residual
+            //x (seq, n_kv_h * n_groups * dqkv)
+            //O_weight 
+            OP::matmul_transb(&mut residual, 1.0, &hidden_states, &self.params.wo[layer], 1.0);
+
+            //rms norm? 看图上说是应该有的，但是没有写todo...
+            OP::rms_norm(
+                &mut hidden_states,
+                &residual,
+                &self.params.rms_att_w[layer],
+                self.eps,
+            );
+            
+            //mlp
+            mlp(&mut residual,&mut hidden_states,&mut gate_buf,&mut up_buf,&self.params.w_up[layer],&self.params.w_down[layer],&self.params.w_gate[layer],&self.params.rms_ffn_w[layer],1e5);
+
         }
 
         // No matter what seq_len, the output is always a 1D vector of length vocab,
@@ -151,9 +167,73 @@ fn self_attention(
     n_groups: usize,
     seq_len: usize,
     total_seq_len: usize,
-    dqkv: usize,
+    dqkv: usize,                     //length of a single q, k, or v vector
 ) {
-    todo!("Implement self_attention");
+    //score = Q @ K.T / np.sqrt(dim)
+    //q  (seq, n_kv_h * n_groups * dqkv)
+    //k^T (n_kv_h * dqkv, total_seq)
+    //resule: (seq, total_seq)
+    let mut attn = Tensor::<f32>::default(&vec![seq_len,total_seq_len]);
+    let mut att_scores_data = unsafe {
+        att_scores.data_mut()
+    };
+    for i in 0..n_kv_h {
+        //get slice of k
+        let start_index = i * dqkv;
+        let cur_k=k.slice(start_index, &vec![seq_len,dqkv]);
+        for j in 0..n_groups{
+            OP::matmul_transb(&mut attn, 0.0, q, &cur_k, 1.0);
+            let attn_data = unsafe { attn.data_mut() };
+            for k in 0..(seq_len*total_seq_len){
+                attn_data[k] = attn_data[k] / (dqkv as f32).sqrt();
+            }
+            //attn 写回 attention score 
+            let base_index = i * j * seq_len * total_seq_len;
+            // https://stackoverflow.com/questions/66609964/looking-for-a-c-memcpy-equivalent
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    attn_data.as_ptr(),
+                    att_scores_data.as_mut_ptr().add(base_index),
+                    seq_len * total_seq_len,
+                );
+            }
+        }
+    }
+    
+    //attn = softmax(score)
+    OP::masked_softmax(att_scores);
+    
+    //x = attn @ V
+    //attn (n_kv_h, n_groups, seq, total_seq)
+    //v (total_seq, n_kv_h * dqkv)
+    //x, aka hidden state  (seq, n_kv_h * n_groups * dqkv)
+    let hidden_states_data = unsafe{hidden_states.data_mut()};
+    let mut x = Tensor::<f32>::default(&vec![seq_len,dqkv]);
+
+    for i in 0..n_kv_h {
+        let cur_v=v.slice(i*dqkv*total_seq_len, &vec![total_seq_len,dqkv]);
+        for j in 0..n_groups{
+            let attn_slice = att_scores.slice(i*j*seq_len*total_seq_len, &vec![seq_len,total_seq_len]);
+            //(seq, total_seq) x (total_seq_len,dqkv) => (seq,dqkv)
+            OP::matmul_transb(&mut x, 0.0, &attn_slice, &cur_v, 1.0);
+            //写回hidden state
+            let base_index = seq_len * i * j * total_seq_len;
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    x.data().as_ptr(),
+                    hidden_states_data.as_mut_ptr().add(base_index),
+                    seq_len * dqkv,
+                );
+            }
+        }
+    }
+    //TODO：删除unsafe部分，一个或许更好的写法:
+    /*for i in 0..length {
+        let src = &table.data()[indices.data()[i] as usize * dim..][..dim];
+        let dst = &mut unsafe { y.data_mut() }[i * dim..][..dim];
+        dst.copy_from_slice(src);
+    }
+    */
 }
 
 fn mlp(

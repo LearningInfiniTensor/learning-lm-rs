@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::intrinsics::sqrtf32;
+//use std::intrinsics::sqrtf32;
 use std::vec;
 
 use crate::config::LlamaConfigJson;
@@ -72,6 +72,8 @@ impl Llama<f32> {
 
         // Computation Starts Here
         // Embedding lookup
+        //input (,seq_len) => residual (seq_len,self.d)
+        //相当于，这个forward自带批处理功能？
         OP::gather(&mut residual, input, &self.params.embedding_table);
 
         for layer in 0..self.n_layers {
@@ -141,6 +143,8 @@ impl Llama<f32> {
         logits
     }
 
+    //你需要初始化一个会被复用的kvcache，并写一个多轮推理的循环，每一轮的输出作为下一轮的输入。你需要根据用户传的最大生成token数以及是否出现结束符来判断是否停止推理，并返回完整推理结果。
+
     pub fn generate(
         &self,
         token_ids: &[u32],
@@ -151,9 +155,29 @@ impl Llama<f32> {
     ) -> Vec<u32>{
         let mut result = Vec::<u32>::new();
         
-        todo!("实现文本生成");
-        
-        result
+        //初始化一个会被复用的kvcache
+        let mut cache = self.new_cache();
+
+        //多轮推理的循环
+        //prefill∏
+        //TODO，是否需要添加一个bos_token_id
+        let prompt = Tensor::<u32>::new(token_ids.to_vec(), &vec![max_len]);
+        let logit = self.forward(&prompt, &mut cache);
+        let first_token = OP::random_sample(&logit, top_p, top_k, temperature);
+        result.push(first_token);
+
+        //decode
+        //不知道要不要把first_token append 到prompt的后面，然后一起给forward，还是如何
+        for _ in 0..self.max_seq_len {
+            let forward_tensor = Tensor::<u32>::new(result.clone(),&vec![result.len()]);
+            self.forward(&forward_tensor, &mut cache);
+            let cur_token = OP::random_sample(&logit, top_p, top_k, temperature);
+            if cur_token == self.eos_token_id {
+                break;
+            }
+            result.push(cur_token);
+        }
+        result //这里的result还需要decode，感觉是纯粹tokenid
     }
 }
 

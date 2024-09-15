@@ -24,5 +24,8 @@ fn main() {
         4,
         1.,
     );
+    
+    //greedy
+    //let output_ids = llama.generate(input_ids,500,1.0,1,1.);
     println!("{}", tokenizer.decode(&output_ids, true).unwrap());
 }

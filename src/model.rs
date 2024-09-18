@@ -141,7 +141,7 @@ impl Llama<f32> {
             //C=\alpha AB^T + \beta C
             OP::matmul_transb(&mut residual, 1.0 , &hidden_states, &self.params.wo[layer], 1.0);
             
-            residual.print();
+            residual.print();//✅
 
 
 
@@ -165,14 +165,14 @@ impl Llama<f32> {
         
         //hidden_states (1, self.d)
         //residual (,self.d)
-        /*
+
         OP::rms_norm(
             &mut hidden_states,
             &residual,
             &self.params.rms_out_w,
             self.eps,
         );
-        */
+
         OP::matmul_transb(&mut logits, 0., &hidden_states, &self.params.lm_head, 1.0);
 
         logits

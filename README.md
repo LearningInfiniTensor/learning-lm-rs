@@ -135,7 +135,7 @@ residual = output + residual
 
 第二，我们需要将 (seq_len, dim) 和 (dim, total_seq_len) 的两个矩阵做矩阵乘才能得到我们想要的形状，而现在的QK都不满足这个条件；你有几种不同的选择处理这个情况，一是对矩阵进行reshape和转置（意味着拷贝），再用一个支持广播（因为你需要对“头”进行正确对应）的矩阵乘进行计算，二是将这些矩阵视为多个向量，并按照正确的对应关系手动进行索引和向量乘法，这里我推荐使用更容易理解的后一种方法。
 
-同样的，在对权重矩阵进行完softmax后和V进行矩阵乘时也会遇到这个情况。
+同样的，在对权重矩阵进行完masked_softmax后和V进行矩阵乘时也会遇到这个情况。
 
 对于每个头，完整的Self-Attention层的计算过程如下；
 
@@ -146,10 +146,11 @@ K = RoPE(x @ K_weight.T)
 V = x @ V_weight.T
 K = cat(K_cache, K)
 V = cat(V_cache, V)
-### 以下是你需要实现的部分
+### 以下是你需要在函数self_attention中实现的部分
 score = Q @ K.T / sqrt(dim)
-attn = softmax(score)
+attn = masked_softmax(score)
 attn_V = attn @ V
+### 以下是你需要在"down_proj matmul and add residual"处实现的部分
 out = attn_V @ O_weight.T
 residual = out + residual
 ```

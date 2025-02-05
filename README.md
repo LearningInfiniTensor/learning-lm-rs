@@ -94,7 +94,7 @@ residual = output + residual
 
 ### 5. Llama模型参数加载（20分）
 
-请结合课上所讲的模型结构，根据代码种的定义在`src/params.rs`以及`src/model.rs`中补全大模型参数加载代码。项目已经为你做好了safetensors以及json文件的读取功能，你需要将参数原始数据以代码中的形式存于正确的位置，并赋予模型对象正确的config属性。safetensors里带有各张量的名称，应该足够你判断出张量代表的是哪个参数。
+请结合课上所讲的模型结构，根据代码中的定义在`src/params.rs`以及`src/model.rs`中补全大模型参数加载代码。项目已经为你做好了safetensors以及json文件的读取功能，你需要将参数原始数据以代码中的形式存于正确的位置，并赋予模型对象正确的config属性。safetensors里带有各张量的名称，应该足够你判断出张量代表的是哪个参数。
 
 以下是大模型config中一些比较重要的属性的含义：
 
